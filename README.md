@@ -1,4 +1,4 @@
-================================================================================
+
                    UBER EXECUTIVE ANALYTICS DASHBOARD
                End-to-End Business Intelligence and Data Engineering
 ================================================================================
@@ -55,7 +55,9 @@ KEY INSIGHTS SUMMARY
 
 
 REPOSITORY STRUCTURE
---------------------------------------------------------------------------------
+
+```text
+
 ├── data/
 │   ├── raw_booking.csv             # Raw 150K Uber booking records
 │   └── cleaned_booking.csv         # Cleaned, standardized tabular dataset
@@ -76,6 +78,7 @@ REPOSITORY STRUCTURE
 │   ├── PROJECT_DOCUMENTATION.txt   # Comprehensive technical whitepaper and DAX dictionary
 │   └── README.txt                  # Project quickstart and architecture overview
 
+```
 
 TECH STACK
 --------------------------------------------------------------------------------
@@ -124,4 +127,3 @@ HOW TO REPRODUCE AND RUN
    - Open powerbi/Uber_Executive_Analytics.pbix.
    - Update MySQL data source credentials or point the local CSV source to cleaned_booking.csv.
    - Click Refresh to populate the dimensional model, DAX measures, and interactive reports.
-================================================================================
