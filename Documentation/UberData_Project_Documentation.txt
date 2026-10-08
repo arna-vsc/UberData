@@ -1,0 +1,270 @@
+================================================================================
+           UBER EXECUTIVE ANALYTICS PLATFORM - PROJECT DOCUMENTATION
+              End-to-End Business Intelligence and Data Engineering Pipeline
+================================================================================
+
+1. EXECUTIVE SUMMARY AND OBJECTIVE
+--------------------------------------------------------------------------------
+This project delivers an enterprise-grade analytics solution built on 150,000 Uber trip booking records. The primary objective is to analyze urban marketplace dynamics, quantify conversion funnel leakages, diagnose cancellation drivers, evaluate vehicle fleet unit economics, and size lost Gross Merchandise Value across an interactive multi-page Power BI executive reporting suite.
+
+The pipeline spans raw data hygiene in Microsoft Excel, automated data cleansing in Python, relational data warehousing in MySQL, exploratory data analysis, dimensional modeling, custom DAX engineering, and executive dashboard design.
+
+
+2. TECHNICAL ARCHITECTURE AND PIPELINE BREAKDOWN
+--------------------------------------------------------------------------------
+
+A. Data Hygiene, Auditing, and Preprocessing - Microsoft Excel and Power Query
+   - Audited the raw 150,000-row tabular dataset across 21 operational columns.
+   - Handled missing and placeholder string indicators across customer ratings, driver ratings, cancellation reasons, and vehicle turnaround times.
+   - Applied TRIM and CLEAN logic to remove invisible whitespace and non-printable characters across dimensions.
+   - Used XLOOKUP to map vehicle types to business segments and commission structures.
+   - Replaced blank cancellation and incomplete indicators with numeric 0 flags, setting reason descriptions for completed trips to Not Applicable.
+   - Verified totals and referential integrity across status categories prior to database ingestion.
+
+B. Database Warehousing and SQL Analytical Views - MySQL 8.0
+   - Designed the primary staging table bookings with targeted data types including VARCHAR, DECIMAL, INT, DATE, TIME, and indexing on high-cardinality fields.
+   - Implemented analytical queries resolving volume distribution, cancellation reasons, distance tiers, and vehicle yield economics.
+   - Built the centralized reporting view v_fact_trips to encapsulate business transformations, temporal dimensions, and derived metrics like fare per kilometer.
+
+C. Statistical Profiling and Exploratory Data Analysis - Python
+   - Ran automated exploratory analysis scripts using Pandas, NumPy, Matplotlib, and Seaborn.
+   - Produced statistical summaries across numerical metrics including VTAT, CTAT, booking value, ride distance, and ratings.
+   - Conducted correlation auditing revealing near-zero correlation between ride distance and fare value, confirming that nominal fares remain flat across trip distances while yield per kilometer scales inversely with distance.
+
+D. Semantic Data Modeling and Star Schema - Power BI Desktop
+   - Structured the reporting data model using Kimball dimensional modeling principles:
+       * Fact Table: FactTrips containing 150,000 records
+       * Dimension Table: DimDate containing full calendar attributes
+       * Dimension Table: DimVehicle containing vehicle tiers, capacity, and market segments
+   - Established single-direction one-to-many relationships with referential integrity.
+   - Created Distance Tier and CSAT Tier calculated columns with numeric sort-by-column keys to ensure logical visual sorting.
+
+
+3. COMPLETE DAX FORMULA REPOSITORY
+--------------------------------------------------------------------------------
+
+Total Bookings = COUNTROWS[FactTrips]
+
+Completed Rides = 
+CALCULATE[
+    COUNTROWS[FactTrips],
+    FactTrips[booking_status] = "Completed"
+]
+
+Failed Bookings = 
+CALCULATE[
+    COUNTROWS[FactTrips],
+    KEEPFILTERS[FactTrips[booking_status] <> "Completed"]
+]
+
+Completion Rate Pct = 
+DIVIDE[[Completed Rides], [Total Bookings], 0]
+
+Failure Rate Pct = 
+DIVIDE[[Failed Bookings], [Total Bookings], 0]
+
+Driver Cancellation Rate Pct = 
+DIVIDE[
+    CALCULATE[
+        COUNTROWS[FactTrips],
+        FactTrips[booking_status] = "Cancelled by Driver"
+    ],
+    [Total Bookings],
+    0
+]
+
+Customer Cancellation Rate Pct = 
+DIVIDE[
+    CALCULATE[
+        COUNTROWS[FactTrips],
+        FactTrips[booking_status] = "Cancelled by Customer"
+    ],
+    [Total Bookings],
+    0
+]
+
+Total Completed Revenue = 
+CALCULATE[
+    SUM[FactTrips[booking_value]],
+    FactTrips[booking_status] = "Completed"
+]
+
+Average Fare per Ride = 
+DIVIDE[[Total Completed Revenue], [Completed Rides], 0]
+
+Avg Fare per KM = 
+DIVIDE[
+    [Total Completed Revenue],
+    CALCULATE[
+        SUM[FactTrips[ride_distance]],
+        FactTrips[booking_status] = "Completed"
+    ],
+    0
+]
+
+Estimated Lost GMV = 
+VAR BenchmarkFare = 
+    CALCULATE[
+        [Average Fare per Ride],
+        ALL[FactTrips[booking_status]]
+    ]
+RETURN
+    [Failed Bookings] * BenchmarkFare
+
+Average Trip Distance = 
+CALCULATE[
+    AVERAGE[FactTrips[ride_distance]],
+    FactTrips[booking_status] = "Completed"
+]
+
+Average VTAT = 
+CALCULATE[
+    AVERAGE[FactTrips[avg_vtat]],
+    NOT[ISBLANK[FactTrips[avg_vtat]]]
+]
+
+Average CTAT = 
+CALCULATE[
+    AVERAGE[FactTrips[avg_ctat]],
+    FactTrips[booking_status] = "Completed"
+]
+
+Severe Pickup Delay Rate Pct = 
+DIVIDE[
+    CALCULATE[
+        COUNTROWS[FactTrips],
+        FactTrips[avg_vtat] > 15
+    ],
+    CALCULATE[
+        COUNTROWS[FactTrips],
+        NOT[ISBLANK[FactTrips[avg_vtat]]]
+    ],
+    0
+]
+
+Average Customer Rating = 
+CALCULATE[
+    AVERAGE[FactTrips[customer_rating]],
+    NOT[ISBLANK[FactTrips[customer_rating]]]
+]
+
+Average Driver Rating = 
+CALCULATE[
+    AVERAGE[FactTrips[driver_ratings]],
+    NOT[ISBLANK[FactTrips[driver_ratings]]]
+]
+
+
+4. DASHBOARD UX AND VISUAL SPECIFICATION
+--------------------------------------------------------------------------------
+Widescreen 16:9 layout designed on modern dark slate palette with background #0F172A, card containers #1E293B, primary accent #3B82F6, success #10B981, and warning #EF4444.
+
+Page 1: Executive Overview
+- KPI Cards: Total Demand 150K, Total Completed GMV ₹47.26M, Completed Rides 93K, Estimated Lost GMV ₹28.97M.
+- Funnel Visual: Total Bookings 150K at 100%, Completed Rides 93K at 62.0%, Driver Cancellations 27K at 18.0%, Customer Cancellations 10.5K at 7.0%, No Driver Found 10.5K at 7.0%, Incomplete Rides 9.0K at 6.0%.
+- Fleet Revenue Contribution: Horizontal bar chart sorted by completed revenue led by Auto ₹11.73M, Go Mini ₹9.41M, Go Sedan ₹8.54M, Bike ₹7.14M, Premier Sedan ₹5.73M, eBike ₹3.30M, and Uber XL ₹1.41M.
+- Distance Tier Economics: Clustered column and line combo visual displaying flat average fare around ₹508 against decaying yield per kilometer across logically sorted tiers Short, Medium, Long, and Very Long.
+- Financial Sizing of Lost GMV: Waterfall breakdown sizing total lost revenue of ₹28.97M across Driver Cancellations ₹13.72M, Customer Cancellations ₹5.34M, No Driver Found ₹5.34M, and Incomplete Rides ₹4.58M.
+
+Page 2: Operations and Fulfillment Diagnostics
+- KPI Cards: Failed Trips 57K, Driver Cancel Rate 18.0%, Customer Cancel Rate 7.0%, Platform Average VTAT 8.46 minutes.
+- Driver Cancellation Causes: Horizontal bar chart ranking customer issues 25.32%, driver sick 25.00%, car issues 24.91%, and over-capacity 24.77%.
+- Customer Cancellation Causes: Horizontal bar chart ranking wrong address 22.50%, change of plans 22.41%, driver stationary 22.24%, and driver requested cancel 21.86%.
+- Top 10 High Failure Hotspots: Expanded horizontal bar chart displaying all 10 failure zones led by Pragati Maidan 382, Saket 374, Vinobapuri 373, Akshardham 368, Badshahpur 362, Udyog Vihar 358, AIIMS 356, Badarpur 354, GTB Nagar 352, and Keshav Puram 352.
+- Dispatch Speed and SLA Delays: Line and column visual tracking average VTAT around 8.46 minutes and severe delays over 15 minutes holding stable at 2.6% across all vehicle tiers.
+
+Page 3: Fleet Performance and Customer Experience
+- KPI Cards: Customer CSAT 4.40, Driver Rating 4.23, Average Distance 26.00 km, Completed Volume 93K.
+- Fleet Scorecard Matrix: Complete tabular performance grid showing volume, conversion rate, gross revenue, average fare, distance, and ratings across all 7 vehicle tiers.
+- Duration vs CSAT Analysis: Grouped column chart demonstrating that dispatch wait times and trip durations remain identical across High, Medium, and Low CSAT bands.
+- Payment Method Distribution: Donut chart displaying revenue share across UPI ₹21.27M at 45.02%, Cash ₹11.76M at 24.88%, Uber Wallet ₹5.67M at 12.00%, Credit Card ₹4.75M at 10.06%, and Debit Card ₹3.81M at 8.06%, formatted with clean non-truncated center callout.
+
+Drillthrough and Bookmark State Actions
+- Dedicated Location Diagnostic drillthrough view enabling granular analysis for any selected pickup hotspot.
+- Global Reset Filters bookmark buttons on every page resetting interactive slicers.
+
+
+5. BUSINESS QUESTIONS AND EMPIRICAL FINDINGS - Q1 TO Q10
+--------------------------------------------------------------------------------
+
+Q1: Conversion Funnel and Platform Fulfillment
+- Total Platform Bookings: 150,000
+- Completed Rides: 93,000 trips representing 62.00% fulfillment rate
+- Unfulfilled Drop-off: 57,000 trips representing 38.00% leakage rate
+- Leakage Breakdown: Driver Cancellations 18.00%, Customer Cancellations 7.00%, No Driver Found 7.00%, Incomplete Rides 6.00%
+
+Q2: Customer Cancellation Drivers
+- Total Customer Cancellations: 10,500 trips
+- Incorrect Address: 2,362 trips at 22.50% share
+- Change of Plans: 2,353 trips at 22.41% share
+- Driver Stationary: 2,335 trips at 22.24% share
+- Driver Asked to Cancel: 2,295 trips at 21.86% share
+- AC Not Working: 1,155 trips at 11.00% share
+
+Q3: Driver Cancellation Drivers
+- Total Driver Cancellations: 27,000 trips
+- Customer Related Issues: 6,837 trips at 25.32% share
+- Driver Sick: 6,751 trips at 25.00% share
+- Personal and Vehicle Issues: 6,726 trips at 24.91% share
+- Excess Passengers: 6,686 trips at 24.77% share
+
+Q4: Operational Failure Hotspots
+- Analyzed across 50 pickup zones in Delhi NCR
+- Top 10 Zones by Unfulfilled Volume: Pragati Maidan 382, Saket 374, Vinobapuri 373, Akshardham 368, Badshahpur 362, Udyog Vihar 358, AIIMS 356, Badarpur 354, GTB Nagar 352, and Keshav Puram 352
+
+Q5: Dispatch Speed and SLA Wait Times
+- Platform Mean VTAT: 8.46 minutes
+- Severe Delay Rate over 15 minutes: 2.60% platform average
+- Vehicle Variation: Auto 8.44 min, Premier Sedan 8.44 min, Uber XL 8.45 min, eBike 8.46 min, Go Mini 8.46 min, Go Sedan 8.47 min, Bike 8.48 min
+- Finding: Dispatch wait speed is uniform across all categories
+
+Q6: Fleet Revenue Contribution
+- Total Gross Completed Revenue: ₹47,260,574.00
+- Revenue by Fleet Tier:
+  1. Auto: ₹11,727,615.00 generating 24.81% share across 23,155 completed rides
+  2. Go Mini: ₹9,411,418.00 generating 19.91% share across 18,549 completed rides
+  3. Go Sedan: ₹8,538,560.00 generating 18.07% share across 16,676 completed rides
+  4. Bike: ₹7,144,913.00 generating 15.12% share across 14,034 completed rides
+  5. Premier Sedan: ₹5,733,655.00 generating 12.13% share across 11,252 completed rides
+  6. eBike: ₹3,298,157.00 generating 6.98% share across 6,551 completed rides
+  7. Uber XL: ₹1,406,256.00 generating 2.98% share across 2,783 completed rides
+
+Q7: Distance Tier Yield Economics
+- Empirical Finding: Pearson correlation between trip distance and fare value is r = 0.006, indicating nominal trip fares remain flat near ₹508
+- Unit Economics Breakdown:
+  * Short under 5 km: 2,784 rides, average fare ₹502.91, yield ₹153.73 per km
+  * Medium 5 to 15 km: 16,750 rides, average fare ₹503.49, yield ₹55.39 per km
+  * Long 15 to 30 km: 45,699 rides, average fare ₹511.01, yield ₹23.64 per km
+  * Very Long over 30 km: 27,767 rides, average fare ₹509.30, yield ₹13.00 per km
+
+Q8: Fleet Operational Performance Profile
+- Fulfillment rates remain stable across all tiers between 61.9% and 62.3%
+- Distance completed averages 26.00 km uniformly across categories
+
+Q9: Satisfaction Correlation with Trip Duration
+- Average Customer Rating: 4.40 out of 5.00
+- Average Driver Rating: 4.23 out of 5.00
+- Duration Comparison:
+  * High CSAT: VTAT 8.45 min, CTAT 29.17 min
+  * Medium CSAT: VTAT 8.44 min, CTAT 29.13 min
+  * Low CSAT: VTAT 8.47 min, CTAT 29.14 min
+- Operational Finding: Rating penalties stem from qualitative in-vehicle friction rather than operational delays
+
+Q10: Financial Sizing of Lost GMV
+- Total Estimated Lost GMV: ₹28,969,426.00
+- Financial Sizing Breakdown:
+  1. Driver Cancellations: 27,000 lost trips totaling ₹13,720,830.00
+  2. Customer Cancellations: 10,500 lost trips totaling ₹5,335,878.00
+  3. No Driver Found: 10,500 lost trips totaling ₹5,335,878.00
+  4. Incomplete Trips: 9,000 lost trips totaling ₹4,576,840.00
+
+
+6. TECHNICAL SKILLS DEMONSTRATED
+--------------------------------------------------------------------------------
+1. Microsoft Excel and Power Query: Formula modeling via XLOOKUP, SUMIFS, and IFS; Power Query M transformation; Table structure conversion; integer flag sanitation; Pivot Table auditing.
+2. SQL and Warehousing: MySQL 8.0 schema architecture; composite indexing; window functions like SUM OVER and DENSE_RANK; persistent aggregation views.
+3. Statistical Analysis in Python: Automated Pandas data cleaning; IQR outlier detection; Pearson correlation profiling; automated chart generation.
+4. Dimensional Modeling: Star Schema architecture; single-direction one-to-many relationships; Kimball design standards; calculated sorting columns.
+5. Advanced DAX: Context transition management; dynamic numerator and denominator ratios; ALL filter removal; KEEPFILTERS application; benchmark metrics.
+6. Executive BI Design: Responsive dark slate UX; funnel conversion architecture; drillthrough navigation; bookmark state control.
+================================================================================
